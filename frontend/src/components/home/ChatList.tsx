@@ -156,7 +156,6 @@ const ChatList = ({
           });
         }
 
-        // Update the outputs in a more reliable way
         if (output && output.length > 0) {
           // Only mark as complete for Orchestrator
           if (agent_name === "Orchestrator") {
@@ -168,33 +167,27 @@ const ChatList = ({
             const existingIndex = prevList.findIndex(
               (item) => item.agent === agent_name
             );
+
             let newList;
+            let newOutputIndex; // Track the index of the new/updated output
 
             if (existingIndex >= 0) {
               // Update existing output
               newList = [...prevList];
               newList[existingIndex] = {agent: agent_name, output};
+              newOutputIndex = existingIndex;
             } else {
               // Add new output
               newList = [...prevList, {agent: agent_name, output}];
+              newOutputIndex = newList.length - 1;
             }
 
-            // If this is the first output or it's from the Orchestrator, set it as current
-            if (prevList.length === 0 || agent_name === "Orchestrator") {
-              const orchestratorIndex = newList.findIndex(
-                (item) => item.agent === "Orchestrator"
-              );
-              setTimeout(() => {
-                if (orchestratorIndex !== -1) {
-                  setCurrentOutput(orchestratorIndex);
-                  // Trigger animation when setting a new output
-                  setAnimateOutputEntry(true);
-                } else {
-                  setCurrentOutput(newList.length - 1);
-                  setAnimateOutputEntry(true);
-                }
-              }, 0);
-            }
+            // Always set the most recent output as current
+            // Use setTimeout to ensure state updates properly
+            setTimeout(() => {
+              setCurrentOutput(newOutputIndex);
+              setAnimateOutputEntry(true);
+            }, 0);
 
             return newList;
           });
@@ -211,10 +204,6 @@ const ChatList = ({
       }
       return [...prev];
     });
-
-    if (lastJsonMessage && messages.length > 0) {
-      setTimeout(scrollToBottom, 300);
-    }
   }, [lastJsonMessage, messages.length, setIsLoading, setMessages]);
 
   const getOutputBlock = (type: string, output: string | undefined) => {
