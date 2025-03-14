@@ -1,4 +1,12 @@
-import {BrainCircuit, Globe, SquareCode, SquareSlash} from "lucide-react";
+import {
+  BrainCircuit,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  SquareCode,
+  SquareSlash,
+  X,
+} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import favicon from "../../assets/Favicon-contexton.svg";
 import {ScrollArea} from "../ui/scroll-area";
@@ -8,8 +16,10 @@ import rehypeRaw from "rehype-raw";
 import remarkBreaks from "remark-breaks";
 import {Skeleton} from "../ui/skeleton";
 
-import {ChatListPageProps, SystemMessage} from "@/types/chatTypes";
+import {getTimeAgo} from "@/lib/utils";
+import {AgentOutput, ChatListPageProps, SystemMessage} from "@/types/chatTypes";
 import useWebSocket, {ReadyState} from "react-use-websocket";
+import {Button} from "../ui/button";
 import {Card} from "../ui/card";
 import {CodeBlock} from "./CodeBlock";
 import {ErrorAlert} from "./ErrorAlert";
@@ -17,54 +27,6 @@ import LoadingView from "./Loading";
 import {TerminalBlock} from "./TerminalBlock";
 
 const {VITE_WEBSOCKET_URL} = import.meta.env;
-
-const getTimeAgo = (dateString: string): string => {
-  const date =
-    dateString.charAt(dateString.length - 1) === "Z"
-      ? new Date(dateString)
-      : new Date(dateString + "Z");
-
-  const now = new Date();
-
-  const diffTime = Math.abs(now.getTime() - date.getTime());
-  const diffSeconds = Math.floor(diffTime / 1000);
-
-  // Less than a minute
-  if (diffSeconds < 60) {
-    return `${diffSeconds} ${diffSeconds === 1 ? "second" : "seconds"} ago`;
-  }
-
-  // Less than an hour
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) {
-    return `${diffMinutes} ${diffMinutes === 1 ? "minute" : "minutes"} ago`;
-  }
-
-  // Less than a day
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 12) {
-    return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
-  }
-
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return "Today";
-  } else if (diffDays === 1) {
-    return "Yesterday";
-  } else if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  } else if (diffDays < 30) {
-    const weeks = Math.floor(diffDays / 7);
-    return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
-  } else if (diffDays < 365) {
-    const months = Math.floor(diffDays / 30);
-    return `${months} ${months === 1 ? "month" : "months"} ago`;
-  } else {
-    const years = Math.floor(diffDays / 365);
-    return `${years} ${years === 1 ? "year" : "years"} ago`;
-  }
-};
 
 const ChatList = ({
   messages,
@@ -76,6 +38,11 @@ const ChatList = ({
   const [isIframeLoading, setIsIframeLoading] = useState<boolean>(true);
   const [liveUrl, setLiveUrl] = useState<string>("");
   const [animateIframeEntry, setAnimateIframeEntry] = useState<boolean>(false);
+  // Modify your outputs state to use a map structure for better tracking
+  const [outputsList, setOutputsList] = useState<AgentOutput[]>([]);
+  const [currentOutput, setCurrentOutput] = useState<number | null>(null);
+  // Add animation state for output panel
+  const [animateOutputEntry, setAnimateOutputEntry] = useState<boolean>(false);
 
   // Create a ref for the scroll container
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -149,7 +116,6 @@ const ChatList = ({
         if (live_url) {
           setLiveUrl(live_url);
           setIsIframeLoading(true);
-          // Trigger animation for iframe container
           setAnimateIframeEntry(true);
         } else if (agent_name !== "Web Surfer Agent") {
           setLiveUrl("");
@@ -190,8 +156,48 @@ const ChatList = ({
           });
         }
 
-        if (agent_name === "Orchestrator" && output && output.length > 0) {
-          setIsLoading(false);
+        // Update the outputs in a more reliable way
+        if (output && output.length > 0) {
+          // Only mark as complete for Orchestrator
+          if (agent_name === "Orchestrator") {
+            setIsLoading(false);
+          }
+
+          setOutputsList((prevList) => {
+            // Check if this agent already has an output
+            const existingIndex = prevList.findIndex(
+              (item) => item.agent === agent_name
+            );
+            let newList;
+
+            if (existingIndex >= 0) {
+              // Update existing output
+              newList = [...prevList];
+              newList[existingIndex] = {agent: agent_name, output};
+            } else {
+              // Add new output
+              newList = [...prevList, {agent: agent_name, output}];
+            }
+
+            // If this is the first output or it's from the Orchestrator, set it as current
+            if (prevList.length === 0 || agent_name === "Orchestrator") {
+              const orchestratorIndex = newList.findIndex(
+                (item) => item.agent === "Orchestrator"
+              );
+              setTimeout(() => {
+                if (orchestratorIndex !== -1) {
+                  setCurrentOutput(orchestratorIndex);
+                  // Trigger animation when setting a new output
+                  setAnimateOutputEntry(true);
+                } else {
+                  setCurrentOutput(newList.length - 1);
+                  setAnimateOutputEntry(true);
+                }
+              }, 0);
+            }
+
+            return newList;
+          });
         }
 
         // Create a new array to ensure state update
@@ -223,7 +229,8 @@ const ChatList = ({
         return <TerminalBlock content={output} />;
       default:
         return (
-          <span className="text-base break-words max-w-[95%]">
+          <span className="text-base leading-7 break-words p-2">
+            {" "}
             <Markdown
               remarkPlugins={[remarkBreaks]}
               rehypePlugins={[rehypeRaw]}
@@ -263,6 +270,88 @@ const ChatList = ({
             className="text-primary"
           />
         );
+    }
+  };
+
+  const getAgentOutputCard = (type: string) => {
+    switch (type) {
+      case "Coder Agent":
+        return (
+          <p className="flex items-center gap-4">
+            <SquareCode
+              size={20}
+              absoluteStrokeWidth
+              className="text-primary"
+            />{" "}
+            Check Generated Code
+          </p>
+        );
+
+      case "Coder Executor Agent":
+        return (
+          <p className="flex items-center gap-4">
+            <SquareSlash
+              size={20}
+              absoluteStrokeWidth
+              className="text-primary"
+            />
+            Check Execution Results
+          </p>
+        );
+
+      case "Executor Agent":
+        return (
+          <p className="flex items-center gap-4">
+            <SquareSlash
+              size={20}
+              absoluteStrokeWidth
+              className="text-primary"
+            />
+            Check Execution Results
+          </p>
+        );
+
+      case "Web Surfer Agent":
+        return (
+          <p className="flex items-center gap-4">
+            <Globe size={20} absoluteStrokeWidth className="text-primary" />
+            Check Browsing History Replay
+          </p>
+        );
+
+      default:
+        return (
+          <p className="flex items-center gap-4">
+            <BrainCircuit
+              size={20}
+              absoluteStrokeWidth
+              className="text-primary"
+            />
+            Check Output
+          </p>
+        );
+    }
+  };
+
+  // Function to handle output selection with animation
+  const handleOutputSelection = (index: number) => {
+    // If we're already showing this output, don't do anything
+    if (currentOutput === index) return;
+
+    // If we're switching from one output to another, animate the transition
+    if (currentOutput !== null) {
+      // Set animation flag to false first (to trigger exit animation)
+      setAnimateOutputEntry(false);
+
+      // After a short delay, change the output and trigger entry animation
+      setTimeout(() => {
+        setCurrentOutput(index);
+        setAnimateOutputEntry(true);
+      }, 300); // Match this with CSS transition duration
+    } else {
+      // If we're showing an output for the first time
+      setCurrentOutput(index);
+      setAnimateOutputEntry(true);
     }
   };
 
@@ -322,6 +411,13 @@ const ChatList = ({
     }
   }, [liveUrl]);
 
+  // Reset output animation flag when output is hidden
+  useEffect(() => {
+    if (currentOutput === null) {
+      setAnimateOutputEntry(false);
+    }
+  }, [currentOutput]);
+
   window.addEventListener("message", function (event) {
     if (event.data === "browserbase-disconnected") {
       console.log("Message received from iframe:", event.data);
@@ -330,8 +426,15 @@ const ChatList = ({
     }
   });
 
-  // Calculate width based on whether liveUrl is present
-  const chatContainerWidth = liveUrl ? "50%" : "65%";
+  // Calculate width based on whether liveUrl or output is present
+  const chatContainerWidth = liveUrl || currentOutput !== null ? "50%" : "65%";
+
+  // Calculate animation classes for output panel
+  const outputPanelClasses = `border-2 rounded-xl w-[50%] flex flex-col h-[95%] justify-between items-center transition-all duration-700 ease-in-out ${
+    animateOutputEntry
+      ? "opacity-100 translate-x-0 animate-fade-in animate-once animate-duration-1000"
+      : "opacity-0 translate-x-2"
+  }`;
 
   return (
     <div className="w-full h-full flex justify-center items-center px-4 gap-4">
@@ -340,7 +443,7 @@ const ChatList = ({
         style={{width: chatContainerWidth}}
       >
         <ScrollArea className="h-[95%] w-full" ref={scrollAreaRef}>
-          <div className="space-y-4 pr-5 w-full">
+          <div className="space-y-6 pr-5 w-full">
             {messages.map((message, idx) => {
               return message.role === "user" ? (
                 <div
@@ -362,7 +465,7 @@ const ChatList = ({
                   )}
                   <div
                     className="bg-secondary text-secondary-foreground rounded-lg p-3 break-words 
-                      max-w-[80%] transform transition-all duration-300 hover:shadow-md hover:-translate-y-1 animate-fade-right animate-once animate-duration-500"
+                    max-w-[80%] transform transition-all duration-300 hover:shadow-md hover:-translate-y-1 animate-fade-right animate-once animate-duration-500"
                   >
                     {message.prompt}
                   </div>
@@ -433,7 +536,7 @@ const ChatList = ({
                                   {systemMessage.agent_name}
                                 </span>
                               </div>
-                              <div className="space-y-3 px-2">
+                              <div className="space-y-5 px-2">
                                 <div className="flex flex-col gap-2 text-gray-300 animate-fade-in animate-once animate-duration-700">
                                   <span className="text-base break-words">
                                     {systemMessage.instructions}
@@ -471,19 +574,26 @@ const ChatList = ({
                                       ))}
                                     </div>
                                   )}
-                                {systemMessage.output && (
-                                  <div className="flex flex-col gap-2 text-gray-300 w-[98%]">
-                                    <p className="text-muted-foreground text-base animate-fade-in animate-once animate-duration-500">
-                                      Output:
-                                    </p>
-                                    <div className="animate-fade-in animate-once animate-delay-500 animate-duration-1000 w-[98%]">
-                                      {getOutputBlock(
-                                        systemMessage.agent_name,
-                                        systemMessage.output
+                                {systemMessage.output &&
+                                  systemMessage.output.length > 0 && (
+                                    <div
+                                      onClick={() =>
+                                        handleOutputSelection(
+                                          outputsList.findIndex(
+                                            (item) =>
+                                              item.agent ===
+                                              systemMessage.agent_name
+                                          )
+                                        )
+                                      }
+                                      className="rounded-md w- py-2 px-4 bg-secondary text-secondary-foreground flex items-center justify-between cursor-pointer transition-all hover:shadow-md hover:scale-102 duration-300 animate-pulse-once"
+                                    >
+                                      {getAgentOutputCard(
+                                        systemMessage.agent_name
                                       )}
+                                      <ChevronRight absoluteStrokeWidth />
                                     </div>
-                                  </div>
-                                )}
+                                  )}
                               </div>
                             </Card>
                           )
@@ -493,26 +603,33 @@ const ChatList = ({
                           message.data.find(
                             (systemMessage) =>
                               systemMessage.agent_name === "Orchestrator" &&
-                              systemMessage.output
+                              systemMessage?.output
                           ) && (
                             <div className="space-y-3 animate-fade-in animate-once animate-delay-700 animate-duration-1000 w-[98%]">
                               {message.data.find(
                                 (systemMessage) =>
                                   systemMessage.agent_name === "Orchestrator"
                               )?.status_code === 200 ? (
-                                <div className="flex flex-col gap-2 text-gray-300 w-[98%]">
-                                  <p className="text-muted-foreground text-base animate-fade-in animate-once animate-duration-500">
-                                    Summary:
-                                  </p>
-                                  <div className="transition-all duration-500 ease-in transform hover:translate-x-1 animate-fade-in animate-once animate-duration-1000 w-[98%]">
-                                    {getOutputBlock(
-                                      "Orchestrator",
-                                      message.data.find(
-                                        (systemMessage) =>
-                                          systemMessage.agent_name ===
-                                          "Orchestrator"
-                                      )?.output
-                                    )}
+                                <div
+                                  onClick={() =>
+                                    handleOutputSelection(
+                                      outputsList.findIndex(
+                                        (item) => item.agent === "Orchestrator"
+                                      )
+                                    )
+                                  }
+                                  className="rounded-md py-2 bg-[#F7E8FA] text-[#BD24CA] cursor-pointer transition-all hover:shadow-md hover:scale-102 duration-300 animate-pulse-once"
+                                >
+                                  <div className="px-3 flex items-center justify-between">
+                                    <img
+                                      src={favicon}
+                                      className="animate-spin-slow animate-duration-3000"
+                                    />
+                                    <p className="text-xl font-medium">
+                                      Task has been completed. Click here to
+                                      view results.
+                                    </p>
+                                    <ChevronRight absoluteStrokeWidth />
                                   </div>
                                 </div>
                               ) : (
@@ -542,8 +659,8 @@ const ChatList = ({
         <div
           className={`border-2 rounded-xl w-[50%] flex flex-col h-[95%] justify-between items-center transition-all duration-700 ease-in-out ${
             animateIframeEntry
-              ? "animate-fade-in animate-once animate-duration-1000"
-              : "opacity-0"
+              ? "opacity-100 translate-x-0 animate-fade-in animate-once animate-duration-1000"
+              : "opacity-0 translate-x-8"
           }`}
         >
           <div className="bg-secondary rounded-t-xl h-[8vh] w-full flex items-center justify-between px-8 animate-fade-down animate-once animate-duration-700">
@@ -581,6 +698,72 @@ const ChatList = ({
           </div>
           <div className="bg-secondary h-[7vh] flex w-full rounded-b-xl justify-end px-4 animate-fade-up animate-once animate-duration-700">
             {/* Browser session footer */}
+          </div>
+        </div>
+      )}
+      {outputsList.length > 0 && currentOutput !== null && (
+        <div className={outputPanelClasses}>
+          <div className="bg-secondary rounded-t-xl h-[8vh] w-full flex items-center justify-between px-8 animate-fade-down animate-once animate-duration-700">
+            <p className="text-2xl text-secondary-foreground animate-fade-right animate-once animate-duration-700">
+              {outputsList[currentOutput]?.agent === "Orchestrator"
+                ? "Final Summary"
+                : outputsList[currentOutput]?.agent}
+            </p>
+            <div className="flex items-center gap-3">
+              <X
+                className="cursor-pointer hover:text-red-500 transition-colors duration-300"
+                onClick={() => {
+                  setAnimateOutputEntry(false);
+                  setTimeout(() => setCurrentOutput(null), 300);
+                }}
+              />
+            </div>
+          </div>
+          <div className="h-[71vh] w-full overflow-y-auto scrollbar-thin pr-2">
+            {outputsList[currentOutput]?.output && (
+              <div
+                className={`p-3 w-full h-full transition-all duration-500 ${
+                  animateOutputEntry
+                    ? "opacity-100 translate-y-0 animate-fade-in animate-once animate-duration-1000"
+                    : "opacity-0 translate-y-4"
+                }`}
+              >
+                {getOutputBlock(
+                  outputsList[currentOutput]?.agent,
+                  outputsList[currentOutput]?.output
+                )}
+              </div>
+            )}
+          </div>
+          <div className="bg-secondary h-[7vh] flex w-full rounded-b-xl px-4 animate-fade-up animate-once animate-duration-700">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (currentOutput > 0) {
+                    handleOutputSelection(currentOutput - 1);
+                  }
+                }}
+                disabled={currentOutput === 0}
+                className="transition-all duration-300 hover:bg-primary/10"
+              >
+                <ChevronLeft /> Previous
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (currentOutput < outputsList.length - 1) {
+                    handleOutputSelection(currentOutput + 1);
+                  }
+                }}
+                disabled={currentOutput === outputsList.length - 1}
+                className="transition-all duration-300 hover:bg-primary/10"
+              >
+                Next <ChevronRight />
+              </Button>
+            </div>
           </div>
         </div>
       )}

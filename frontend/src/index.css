@@ -6,7 +6,6 @@
 
 :root {
   font-family: DM Sans, serif;
-
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -114,6 +113,14 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 19px;
+  --text-2xl: 21px;
+  --text-3xl: 24px;
 }
 
 @layer base {
@@ -127,6 +134,7 @@
 
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
+  height: 4px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {

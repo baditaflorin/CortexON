@@ -37,10 +37,12 @@ export const TerminalBlock = ({content}: {content: string}) => {
 
   // Function to convert plain text to HTML (handling line breaks and basic formatting)
   const formatTerminalOutput = (text: string) => {
+    // Add styling for command prompts to match your UI theme
     return text
       .replace(/\n/g, "<br/>")
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>");
+      .replace(/\*\*(.*?)\*\*/g, "<strong class='text-primary'>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em class='text-secondary'>$1</em>")
+      .replace(/\$(.*?)$/gm, "<span class='text-emerald-500'>$ $1</span>");
   };
 
   // Custom CSS for blinking cursor
@@ -74,41 +76,21 @@ export const TerminalBlock = ({content}: {content: string}) => {
   }, []);
 
   return (
-    <div className="w-full">
-      <div className="rounded-lg bg-zinc-900 overflow-hidden shadow-lg">
-        {/* Terminal header */}
-        <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/50">
-          <span className="text-sm text-gray-400">Terminal</span>
-          <div className="flex items-center space-x-2">
-            {isTyping && (
-              <span className="text-xs text-green-400 animate-pulse">
-                typing...
-              </span>
-            )}
-            <div className="w-3 h-3 rounded-full bg-red-500 opacity-60 hover:opacity-100"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-500 opacity-60 hover:opacity-100"></div>
-            <div className="w-3 h-3 rounded-full bg-green-500 opacity-60 hover:opacity-100"></div>
-          </div>
-        </div>
+    <div className="relative">
+      <pre
+        ref={terminalRef}
+        className="overflow-auto p-2 text-sm leading-6 text-gray-300 font-mono"
+        style={{
+          maxWidth: "100%",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+        dangerouslySetInnerHTML={{
+          __html: formatTerminalOutput(displayedContent),
+        }}
+      />
 
-        {/* Terminal content - using pre tag instead of Markdown */}
-        <div className="relative">
-          <pre
-            ref={terminalRef}
-            className="overflow-auto p-2 text-sm leading-6 text-gray-300 font-mono"
-            style={{
-              maxWidth: "100%",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-            dangerouslySetInnerHTML={{
-              __html: formatTerminalOutput(displayedContent),
-            }}
-          />
-
-          {isTyping && <span style={blinkingCursorStyle} />}
-        </div>
-      </div>
+      {isTyping && <span style={blinkingCursorStyle} />}
     </div>
   );
 };
