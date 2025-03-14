@@ -25,3 +25,8 @@ export interface Message {
   data?: SystemMessage[];
   sent_at?: string;
 }
+
+export interface AgentOutput {
+  agent: string;
+  output: string;
+}
