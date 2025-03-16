@@ -110,6 +110,7 @@ class SystemOrchestrator:
         try:
             if self.websocket and self.websocket.client_state.CONNECTED:
                 await self.websocket.send_text(json.dumps(asdict(message)))
+                logfire.debug(f"WebSocket message sent: {message}")
                 return True
             return False
         except Exception as e:

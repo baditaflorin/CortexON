@@ -11,6 +11,7 @@ from utils.ant_client import get_client
 import subprocess
 import shlex
 import logfire
+from dataclasses import asdict
 from utils.stream_response_format import StreamResponse
 
 load_dotenv()
@@ -105,7 +106,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
             if base_command := command.split()[0]:
                 operation_message = get_high_level_operation_message(command, base_command)
                 ctx.deps.stream_output.steps.append(operation_message)
-                await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
         
         logfire.info(f"Executing shell command: {command}")
         
@@ -122,7 +124,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
             error_msg = f"Operation not permitted"
             if ctx.deps.stream_output and ctx.deps.websocket:
                 ctx.deps.stream_output.steps.append(error_msg)
-                await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
             return f"Error: Command '{base_command}' is not allowed for security reasons."
         
         # Change to the restricted directory
@@ -137,7 +140,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                     # Get the file name
                     file_path = command.split(">", 1)[1].strip()
                     ctx.deps.stream_output.steps.append(f"Writing content to {file_path}")
-                    await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                    await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                    logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                 
                 # Simple parsing for echo "content" > file.txt
                 parts = command.split(">", 1)
@@ -158,14 +162,16 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                     success_msg = f"Successfully wrote to {file_path}"
                     if ctx.deps.stream_output and ctx.deps.websocket:
                         ctx.deps.stream_output.steps.append(f"File {file_path} created successfully")
-                        await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                        await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                        logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                         
                     return success_msg
                 except Exception as e:
                     error_msg = f"Error writing to file: {str(e)}"
                     if ctx.deps.stream_output and ctx.deps.websocket:
                         ctx.deps.stream_output.steps.append(f"Failed to create file {file_path}")
-                        await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                        await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                        logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                         
                     logfire.error(error_msg, exc_info=True)
                     return error_msg
@@ -181,7 +187,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                     # Update stream with more abstract message
                     if ctx.deps.stream_output and ctx.deps.websocket:
                         ctx.deps.stream_output.steps.append(f"Creating file {file_path}")
-                        await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                        await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                        logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                 
                 try:
                     # Parse the command: cat > file.py << 'EOF'\ncode\nEOF
@@ -196,7 +203,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                         error_msg = "Invalid file operation"
                         if ctx.deps.stream_output and ctx.deps.websocket:
                             ctx.deps.stream_output.steps.append(error_msg)
-                            await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                            await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                            logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                         return "Error: Invalid cat command format. Must include redirection."
                     
                     # Parse the heredoc content
@@ -216,26 +224,30 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                             success_msg = f"Successfully wrote multiline content to {file_path}"
                             if ctx.deps.stream_output and ctx.deps.websocket:
                                 ctx.deps.stream_output.steps.append(f"File {file_path} created successfully")
-                                await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                                await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                                logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                                 
                             return success_msg
                         else:
                             error_msg = "File content format error"
                             if ctx.deps.stream_output and ctx.deps.websocket:
                                 ctx.deps.stream_output.steps.append(error_msg)
-                                await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                                await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                                logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                             return "Error: End delimiter not found in heredoc"
                     else:
                         error_msg = "File content format error"
                         if ctx.deps.stream_output and ctx.deps.websocket:
                             ctx.deps.stream_output.steps.append(error_msg)
-                            await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                            await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                            logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                         return "Error: Invalid heredoc format"
                 except Exception as e:
                     error_msg = f"Error processing cat with heredoc: {str(e)}"
                     if ctx.deps.stream_output and ctx.deps.websocket:
                         ctx.deps.stream_output.steps.append(f"Failed to create file {file_path}")
-                        await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                        await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                        logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                         
                     logfire.error(error_msg, exc_info=True)
                     return error_msg
@@ -244,7 +256,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
             if ctx.deps.stream_output and ctx.deps.websocket:
                 operation_msg = get_high_level_execution_message(command, base_command)
                 ctx.deps.stream_output.steps.append(operation_msg)
-                await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
             
             # Use shlex to properly parse the command for all other commands
             args = shlex.split(command)
@@ -264,7 +277,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                 if ctx.deps.stream_output and ctx.deps.websocket:
                     operation_success_msg = get_success_message(command, base_command)
                     ctx.deps.stream_output.steps.append(operation_success_msg)
-                    await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+                    await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                    logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                     
                 logfire.info(f"Command executed successfully: {result.stdout}")
                 return success_msg
@@ -275,8 +289,8 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
                 if ctx.deps.stream_output and ctx.deps.websocket:
                     operation_failed_msg = get_failure_message(command, base_command)
                     ctx.deps.stream_output.steps.append(operation_failed_msg)
-                    await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
-                    
+                    await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+                    logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
                 return error_msg
         finally:
             os.chdir(original_dir)
@@ -285,13 +299,16 @@ async def execute_shell(ctx : RunContext[coder_agent_deps], command: str) -> str
         error_msg = "Command execution timed out after 60 seconds"
         if ctx.deps.stream_output and ctx.deps.websocket:
             ctx.deps.stream_output.steps.append("Operation timed out")
-            await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+            await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+            logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
         return error_msg
     except Exception as e:
         error_msg = f"Error executing command: {str(e)}"
         if ctx.deps.stream_output and ctx.deps.websocket:
             ctx.deps.stream_output.steps.append("Operation failed")
-            await ctx.deps.websocket.send_text(json.dumps(ctx.deps.stream_output.__dict__))
+            await ctx.deps.websocket.send_text(json.dumps(asdict(ctx.deps.stream_output)))
+
+            logfire.debug(f"WebSocket message sent: {json.dumps(asdict(ctx.deps.stream_output))}")
             
         logfire.error(error_msg, exc_info=True)
         return error_msg

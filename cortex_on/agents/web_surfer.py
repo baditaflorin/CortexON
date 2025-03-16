@@ -57,6 +57,7 @@ class WebSurfer:
                                         self.stream_output.live_url = event_data["live_url"]
                                     # Send the update with the preserved or updated live_url
                                     await self.websocket.send_text(json.dumps(asdict(self.stream_output)))
+                                    logfire.debug(f"WebSocket message sent: {self.stream_output}")
                                 final_json_response.append(event_data)
                     else:
                         return await response.json()

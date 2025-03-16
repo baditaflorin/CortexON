@@ -20,6 +20,15 @@ from agents.orchestrator_agent import orchestrator_agent, orchestrator_deps
 load_dotenv()
 
 
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that can handle datetime objects"""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 # Main Orchestrator Class
 class SystemInstructor:
     def __init__(self):
@@ -41,6 +50,7 @@ class SystemInstructor:
         try:
             if self.websocket and self.websocket.client_state.CONNECTED:
                 await self.websocket.send_text(json.dumps(asdict(message)))
+                logfire.debug(f"WebSocket message sent: {message}")
                 return True
             return False
         except Exception as e:
@@ -58,10 +68,14 @@ class SystemInstructor:
             status_code=0
         )
         self.orchestrator_response.append(stream_output)
-        deps_for_orchestrator =  orchestrator_deps(
+
+        # Create dependencies with list to track agent responses
+        deps_for_orchestrator = orchestrator_deps(
             websocket=self.websocket,
-            stream_output=stream_output
+            stream_output=stream_output,
+            agent_responses=self.orchestrator_response  # Pass reference to collection
         )
+
         try:
             # Initialize system
             await self._safe_websocket_send(stream_output)
@@ -72,12 +86,13 @@ class SystemInstructor:
                 user_prompt=task,
                 deps=deps_for_orchestrator
             )
-            stream_output.output = orchestrator_response
+            stream_output.output = orchestrator_response.data
+            logfire.debug(f"Orchestrator response: {orchestrator_response.data}")
             await self._safe_websocket_send(stream_output)
 
             logfire.info("Task completed successfully")
-            return [asdict(i) for i in self.orchestrator_response]
-
+            return [json.loads(json.dumps(asdict(i), cls=DateTimeEncoder)) for i in self.orchestrator_response]
+        
         except Exception as e:
             error_msg = f"Critical orchestration error: {str(e)}\n{traceback.format_exc()}"
             logfire.error(error_msg)

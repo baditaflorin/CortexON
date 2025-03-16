@@ -207,6 +207,7 @@ $functions"""
             await self.websocket.send_text(
                 json.dumps(asdict(self.stream_output))
             )
+
         venv_dir = work_dir / ".venv"
         venv_builder = venv.EnvBuilder(with_pip=True)
         venv_builder.create(venv_dir)

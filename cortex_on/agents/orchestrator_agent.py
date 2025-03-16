@@ -20,6 +20,8 @@ from utils.ant_client import get_client
 class orchestrator_deps:
     websocket: Optional[WebSocket] = None
     stream_output: Optional[StreamResponse] = None
+    # Add a collection to track agent-specific streams
+    agent_responses: Optional[List[StreamResponse]] = None
 
 orchestrator_system_prompt = """You are an AI orchestrator that manages a team of agents to solve tasks. You have access to tools for coordinating the agents and managing the task flow.
 Basic worflow:
@@ -42,22 +44,44 @@ orchestrator_agent = Agent(
     system_prompt=orchestrator_system_prompt,
     deps_type=orchestrator_deps
 )
+
 @orchestrator_agent.tool
 async def plan_task(ctx: RunContext[orchestrator_deps], task: str) -> str:
     """Plans the task and assigns it to the appropriate agents"""
     try:
         logfire.info(f"Planning task: {task}")
-        # Update stream output
-        ctx.deps.stream_output.steps.append("Planning task...")
-        await _safe_websocket_send(ctx.deps.websocket, ctx.deps.stream_output)
+        
+        # Create a new StreamResponse for Planner Agent
+        planner_stream_output = StreamResponse(
+            agent_name="Planner Agent",
+            instructions=task,
+            steps=[],
+            output="",
+            status_code=0
+        )
+        
+        # Add to orchestrator's response collection if available
+        if ctx.deps.agent_responses is not None:
+            ctx.deps.agent_responses.append(planner_stream_output)
+            
+        await _safe_websocket_send(ctx.deps.websocket, planner_stream_output)
+        
+        # Update planner stream
+        planner_stream_output.steps.append("Planning task...")
+        await _safe_websocket_send(ctx.deps.websocket, planner_stream_output)
         
         # Run planner agent
         planner_response = await planner_agent.run(user_prompt=task)
         
-        ctx.deps.stream_output.steps.append("Task planned successfully")
-        # Update stream with plan details
+        # Update planner stream with results
         plan_text = planner_response.data.plan
-        ctx.deps.stream_output.status_code = 200
+        planner_stream_output.steps.append("Task planned successfully")
+        planner_stream_output.output = plan_text
+        planner_stream_output.status_code = 200
+        await _safe_websocket_send(ctx.deps.websocket, planner_stream_output)
+        
+        # Also update orchestrator stream
+        ctx.deps.stream_output.steps.append("Task planned successfully")
         await _safe_websocket_send(ctx.deps.websocket, ctx.deps.stream_output)
         
         return f"Task planned successfully\nTask: {plan_text}"
@@ -65,10 +89,15 @@ async def plan_task(ctx: RunContext[orchestrator_deps], task: str) -> str:
         error_msg = f"Error planning task: {str(e)}"
         logfire.error(error_msg, exc_info=True)
         
-        # Update stream with error
+        # Update planner stream with error
+        if planner_stream_output:
+            planner_stream_output.steps.append(f"Planning failed: {str(e)}")
+            planner_stream_output.status_code = 500
+            await _safe_websocket_send(ctx.deps.websocket, planner_stream_output)
+            
+        # Also update orchestrator stream
         if ctx.deps.stream_output:
             ctx.deps.stream_output.steps.append(f"Planning failed: {str(e)}")
-            ctx.deps.stream_output.status_code = 500
             await _safe_websocket_send(ctx.deps.websocket, ctx.deps.stream_output)
             
         return f"Failed to plan task: {error_msg}"
@@ -87,6 +116,10 @@ async def coder_task(ctx: RunContext[orchestrator_deps], task: str) -> str:
             output="",
             status_code=0
         )
+
+        # Add to orchestrator's response collection if available
+        if ctx.deps.agent_responses is not None:
+            ctx.deps.agent_responses.append(coder_stream_output)
 
         # Send initial update for Coder Agent
         await _safe_websocket_send(ctx.deps.websocket, coder_stream_output)
@@ -139,6 +172,11 @@ async def web_surfer_task(ctx: RunContext[orchestrator_deps], task: str) -> str:
             status_code=0,
             live_url=None
         )
+
+        # Add to orchestrator's response collection if available
+        if ctx.deps.agent_responses is not None:
+            ctx.deps.agent_responses.append(web_surfer_stream_output)
+
         await _safe_websocket_send(ctx.deps.websocket, web_surfer_stream_output)
         
         # Initialize WebSurfer agent
@@ -182,6 +220,7 @@ async def _safe_websocket_send(websocket: Optional[WebSocket], message: Any) -> 
     try:
         if websocket and websocket.client_state.CONNECTED:
             await websocket.send_text(json.dumps(asdict(message)))
+            logfire.debug(f"WebSocket message sent (_safe_websocket_send): {message}")
             return True
         return False
     except Exception as e:
