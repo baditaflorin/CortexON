@@ -41,7 +41,9 @@ When solving tasks, use your provided shell tool for all operations:
   - Directory operations: 'ls', 'mkdir', etc.
   - Code execution: 'python' for running Python scripts
   - Package management: 'pip install' for dependencies
-  
+
+Allowed commands for execute_shell tool are as follows : ls, dir, cat, echo, python, pip, mkdir, touch, rm, cp, mv  
+
 For Python code, don't use python3, just use python for execution.
 
 Follow this workflow:
@@ -65,7 +67,32 @@ Self-verification:
 - If errors occur, fix them and try again with improved code
 - If your approach isn't working after multiple attempts, reconsider your strategy
 
-Reply "TERMINATE" when the task is successfully completed."""
+Output explanation guidelines:
+- After code execution, structure your explanation according to the CoderResult format
+- For each code solution, explain:
+  1. Dependencies: List all packages that must be installed before executing the code
+  2. Content: The actual code that solves the problem
+  3. Code description: A clear explanation of how the code works, its approach, and key components
+
+When presenting results, format your explanation to match the CoderResult class structure:
+- First list dependencies (even if empty)
+- Then provide the complete code content
+- Finally, include a detailed description of the code's functionality and implementation details
+
+Example structure:
+Dependencies:
+- numpy
+- pandas
+
+Content:
+[The complete code solution]
+
+Code Description:
+This solution implements [approach] to solve [problem]. The code first [key step 1], 
+then [key step 2], and finally [produces result]. The implementation handles [edge cases] 
+by [specific technique]. Key functions include [function 1] which [purpose],
+and [function 2] which [purpose].
+"""
             
 
 class CoderResult(BaseModel):
