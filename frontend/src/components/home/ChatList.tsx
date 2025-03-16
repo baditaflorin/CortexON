@@ -156,7 +156,7 @@ const ChatList = ({
           });
         }
 
-        if (output && output.length > 0) {
+        if (output && output.length > 0 && agent_name !== "Web Surfer Agent") {
           // Only mark as complete for Orchestrator
           if (agent_name === "Orchestrator") {
             setIsLoading(false);
