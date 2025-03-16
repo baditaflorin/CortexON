@@ -184,10 +184,13 @@ const ChatList = ({
 
             // Always set the most recent output as current
             // Use setTimeout to ensure state updates properly
+            setAnimateOutputEntry(false);
+
+            // After a short delay, change the output and trigger entry animation
             setTimeout(() => {
               setCurrentOutput(newOutputIndex);
               setAnimateOutputEntry(true);
-            }, 0);
+            }, 300);
 
             return newList;
           });
@@ -564,7 +567,9 @@ const ChatList = ({
                                     </div>
                                   )}
                                 {systemMessage.output &&
-                                  systemMessage.output.length > 0 && (
+                                  systemMessage.output.length > 0 &&
+                                  (systemMessage.agent_name !==
+                                  "Web Surfer Agent" ? (
                                     <div
                                       onClick={() =>
                                         handleOutputSelection(
@@ -582,7 +587,17 @@ const ChatList = ({
                                       )}
                                       <ChevronRight absoluteStrokeWidth />
                                     </div>
-                                  )}
+                                  ) : (
+                                    <div className="flex flex-col gap-2 text-gray-300">
+                                      <p className="text-muted-foreground text-base">
+                                        Output:
+                                      </p>
+                                      {getOutputBlock(
+                                        systemMessage.agent_name,
+                                        systemMessage.output
+                                      )}
+                                    </div>
+                                  ))}
                               </div>
                             </Card>
                           )
