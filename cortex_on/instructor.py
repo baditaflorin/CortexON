@@ -1,23 +1,30 @@
-import os
+# Standard library imports
 import json
+import os
 import traceback
-from typing import List, Optional, Dict, Any, Union, Tuple
-from datetime import datetime
-from pydantic import BaseModel
 from dataclasses import asdict
-import logfire
-from fastapi import WebSocket
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+# Third-party imports
 from dotenv import load_dotenv
+from fastapi import WebSocket
+import logfire
+from pydantic import BaseModel
+from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai import Agent
+
+# Local application imports
+from agents.code_agent import coder_agent
+from agents.orchestrator_agent import orchestrator_agent, orchestrator_deps
+from agents.planner_agent import planner_agent
+from agents.web_surfer import WebSurfer
 from utils.ant_client import get_client
 from utils.stream_response_format import StreamResponse
-from agents.web_surfer import WebSurfer
-from agents.code_agent import coder_agent
-from agents.planner_agent import planner_agent
-from agents.orchestrator_agent import orchestrator_agent, orchestrator_deps
+
 load_dotenv()
+
 
 
 

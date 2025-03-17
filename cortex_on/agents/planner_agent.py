@@ -1,12 +1,17 @@
-from dotenv import load_dotenv
+# Standard library imports
 import os
-from pydantic import Field, BaseModel
+
+# Third-party imports
+from dotenv import load_dotenv
+from fastapi import WebSocket
+import logfire
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
-from fastapi import WebSocket
+
+# Local application imports
 from utils.ant_client import get_client
-import os
-import logfire
+
 
 
 load_dotenv()

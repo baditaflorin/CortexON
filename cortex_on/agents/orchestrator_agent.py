@@ -13,7 +13,7 @@ from pydantic_ai import Agent, RunContext
 from agents.web_surfer import WebSurfer
 from utils.stream_response_format import StreamResponse
 from agents.planner_agent import planner_agent
-from agents.code_agent import coder_agent, coder_agent_deps
+from agents.code_agent import coder_agent, CoderAgentDeps
 from utils.ant_client import get_client
 
 @dataclass
@@ -125,7 +125,7 @@ async def coder_task(ctx: RunContext[orchestrator_deps], task: str) -> str:
         await _safe_websocket_send(ctx.deps.websocket, coder_stream_output)
 
         # Create deps with the new stream_output
-        deps_for_coder_agent = coder_agent_deps(
+        deps_for_coder_agent = CoderAgentDeps(
             websocket=ctx.deps.websocket,
             stream_output=coder_stream_output
         )
@@ -220,7 +220,7 @@ async def _safe_websocket_send(websocket: Optional[WebSocket], message: Any) -> 
     try:
         if websocket and websocket.client_state.CONNECTED:
             await websocket.send_text(json.dumps(asdict(message)))
-            logfire.debug(f"WebSocket message sent (_safe_websocket_send): {message}")
+            logfire.debug("WebSocket message sent (_safe_websocket_send): {message}", message=message)
             return True
         return False
     except Exception as e:

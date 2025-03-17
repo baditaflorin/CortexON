@@ -1,30 +1,32 @@
-import aiohttp
+# Standard library imports
 import json
-from typing import Any, Dict, Optional, Tuple, List
-from datetime import datetime
-import uuid
 import os
+import uuid
+from dataclasses import asdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+# Third-party imports
+import aiohttp
+from dotenv import load_dotenv
+from fastapi import WebSocket
+import logfire
 from pydantic_ai.messages import (
+    ArgsJson,
     ModelRequest,
     ModelResponse,
-    UserPromptPart,
     ToolCallPart,
     ToolReturnPart,
-    ArgsJson,
+    UserPromptPart,
 )
-import logfire
-from fastapi import WebSocket
-from dataclasses import asdict
-from dotenv import load_dotenv
 
+# Local application imports
 from utils.stream_response_format import StreamResponse
 
 load_dotenv()
 
-TIMEOUT = 9999999999999999999999999999999999999999999
 
-AUTOSCRAPER_BEARER_TOKEN = os.getenv("AUTOSCRAPER_BEARER_TOKEN")
-AUTOSCRAPER_USER_ID = os.getenv("AUTOSCRAPER_USER_ID")
+TIMEOUT = 9999999999999999999999999999999999999999999
 
 class WebSurfer:
     def __init__(self, api_url: str = "http://localhost:8000/api/v1/web/stream"):

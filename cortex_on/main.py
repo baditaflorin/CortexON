@@ -1,6 +1,12 @@
+# Standard library imports
+from typing import List, Optional
+
+# Third-party imports
 from fastapi import FastAPI, WebSocket
-from typing import Optional, List
+
+# Local application imports
 from instructor import SystemInstructor
+
 
 app: FastAPI = FastAPI()
 
