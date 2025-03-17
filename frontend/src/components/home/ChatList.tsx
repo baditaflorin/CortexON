@@ -2,6 +2,7 @@ import {
   BrainCircuit,
   ChevronLeft,
   ChevronRight,
+  Component,
   Globe,
   SquareCode,
   SquareSlash,
@@ -65,6 +66,11 @@ const ChatList = ({
       },
       onError: () => {
         setIsLoading(false);
+        console.log("Error connecting to webSocket.");
+      },
+      onClose: () => {
+        setIsLoading(false);
+        console.log("Websocket connection closed.");
       },
       reconnectAttempts: 3,
       retryOnError: true,
@@ -113,11 +119,14 @@ const ChatList = ({
           lastJsonMessage as SystemMessage;
 
         // Update live URL if provided
-        if (live_url) {
-          setLiveUrl(live_url);
-          setIsIframeLoading(true);
-          setAnimateIframeEntry(true);
-        } else if (agent_name !== "Web Surfer Agent") {
+        if (live_url && liveUrl.length === 0) {
+          setCurrentOutput(null);
+          setTimeout(() => {
+            setLiveUrl(live_url);
+            setIsIframeLoading(true);
+            setAnimateIframeEntry(true);
+          }, 300);
+        } else if (agent_name !== "Web Surfer") {
           setLiveUrl("");
         }
 
@@ -128,7 +137,7 @@ const ChatList = ({
 
         if (agentIndex !== -1) {
           let filteredSteps = steps;
-          if (agent_name === "Web Surfer Agent") {
+          if (agent_name === "Web Surfer") {
             const plannerStep = steps.find((step) => step.startsWith("Plan"));
             filteredSteps = plannerStep
               ? [
@@ -156,44 +165,46 @@ const ChatList = ({
           });
         }
 
-        if (output && output.length > 0 && agent_name !== "Web Surfer Agent") {
+        if (output && output.length > 0 && agent_name !== "Web Surfer") {
           // Only mark as complete for Orchestrator
           if (agent_name === "Orchestrator") {
             setIsLoading(false);
           }
 
-          setOutputsList((prevList) => {
-            // Check if this agent already has an output
-            const existingIndex = prevList.findIndex(
-              (item) => item.agent === agent_name
-            );
+          if (status_code === 200) {
+            setOutputsList((prevList) => {
+              // Check if this agent already has an output
+              const existingIndex = prevList.findIndex(
+                (item) => item.agent === agent_name
+              );
 
-            let newList;
-            let newOutputIndex; // Track the index of the new/updated output
+              let newList;
+              let newOutputIndex; // Track the index of the new/updated output
 
-            if (existingIndex >= 0) {
-              // Update existing output
-              newList = [...prevList];
-              newList[existingIndex] = {agent: agent_name, output};
-              newOutputIndex = existingIndex;
-            } else {
-              // Add new output
-              newList = [...prevList, {agent: agent_name, output}];
-              newOutputIndex = newList.length - 1;
-            }
+              if (existingIndex >= 0) {
+                // Update existing output
+                newList = [...prevList];
+                newList[existingIndex] = {agent: agent_name, output};
+                newOutputIndex = existingIndex;
+              } else {
+                // Add new output
+                newList = [...prevList, {agent: agent_name, output}];
+                newOutputIndex = newList.length - 1;
+              }
 
-            // Always set the most recent output as current
-            // Use setTimeout to ensure state updates properly
-            setAnimateOutputEntry(false);
+              // Always set the most recent output as current
+              // Use setTimeout to ensure state updates properly
+              setAnimateOutputEntry(false);
 
-            // After a short delay, change the output and trigger entry animation
-            setTimeout(() => {
-              setCurrentOutput(newOutputIndex);
-              setAnimateOutputEntry(true);
-            }, 300);
+              // After a short delay, change the output and trigger entry animation
+              setTimeout(() => {
+                setCurrentOutput(newOutputIndex);
+                setAnimateOutputEntry(true);
+              }, 300);
 
-            return newList;
-          });
+              return newList;
+            });
+          }
         }
 
         // Create a new array to ensure state update
@@ -207,6 +218,7 @@ const ChatList = ({
       }
       return [...prev];
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastJsonMessage, messages.length, setIsLoading, setMessages]);
 
   const getOutputBlock = (type: string, output: string | undefined) => {
@@ -221,15 +233,61 @@ const ChatList = ({
         return <TerminalBlock content={output} />;
       default:
         return (
-          <span className="text-base leading-7 break-words p-2">
-            {" "}
+          <div className="markdown-container text-base leading-7 break-words p-2">
             <Markdown
               remarkPlugins={[remarkBreaks]}
               rehypePlugins={[rehypeRaw]}
+              components={{
+                code({className, children, ...props}) {
+                  return (
+                    <pre className="code-block">
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  );
+                },
+                h1: ({children}) => (
+                  <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>
+                ),
+                h2: ({children}) => (
+                  <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>
+                ),
+                h3: ({children}) => (
+                  <h3 className="text-lg font-bold mt-4 mb-2">{children}</h3>
+                ),
+                h4: ({children}) => (
+                  <h4 className="text-base font-bold mt-3 mb-2">{children}</h4>
+                ),
+                h5: ({children}) => (
+                  <h5 className="text-sm font-bold mt-3 mb-1">{children}</h5>
+                ),
+                h6: ({children}) => (
+                  <h6 className="text-xs font-bold mt-3 mb-1">{children}</h6>
+                ),
+                p: ({children}) => <p className="mb-4">{children}</p>,
+                a: ({href, children}) => (
+                  <a
+                    href={href}
+                    className="text-primary hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {children}
+                  </a>
+                ),
+                ul: ({children}) => (
+                  <ul className="list-disc pl-6 mb-4">{children}</ul>
+                ),
+                ol: ({children}) => (
+                  <ol className="list-decimal pl-6 mb-4">{children}</ol>
+                ),
+                li: ({children}) => <li className="mb-2">{children}</li>,
+              }}
             >
               {output}
             </Markdown>
-          </span>
+          </div>
         );
     }
   };
@@ -251,16 +309,21 @@ const ChatList = ({
           <SquareSlash size={20} absoluteStrokeWidth className="text-primary" />
         );
 
-      case "Web Surfer Agent":
+      case "Web Surfer":
         return <Globe size={20} absoluteStrokeWidth className="text-primary" />;
 
-      default:
+      case "Planner Agent":
         return (
           <BrainCircuit
             size={20}
             absoluteStrokeWidth
             className="text-primary"
           />
+        );
+
+      default:
+        return (
+          <Component size={20} absoluteStrokeWidth className="text-primary" />
         );
     }
   };
@@ -287,7 +350,7 @@ const ChatList = ({
               absoluteStrokeWidth
               className="text-primary"
             />
-            Check Execution Results
+            Check Executor Results
           </p>
         );
 
@@ -299,11 +362,11 @@ const ChatList = ({
               absoluteStrokeWidth
               className="text-primary"
             />
-            Check Execution Results
+            Check Executor Results
           </p>
         );
 
-      case "Web Surfer Agent":
+      case "Web Surfer":
         return (
           <p className="flex items-center gap-4">
             <Globe size={20} absoluteStrokeWidth className="text-primary" />
@@ -311,7 +374,7 @@ const ChatList = ({
           </p>
         );
 
-      default:
+      case "Planner Agent":
         return (
           <p className="flex items-center gap-4">
             <BrainCircuit
@@ -319,6 +382,14 @@ const ChatList = ({
               absoluteStrokeWidth
               className="text-primary"
             />
+            Check Generated Plan
+          </p>
+        );
+
+      default:
+        return (
+          <p className="flex items-center gap-4">
+            <Component size={20} absoluteStrokeWidth className="text-primary" />
             Check Output
           </p>
         );
@@ -568,8 +639,7 @@ const ChatList = ({
                                   )}
                                 {systemMessage.output &&
                                   systemMessage.output.length > 0 &&
-                                  (systemMessage.agent_name !==
-                                  "Web Surfer Agent" ? (
+                                  (systemMessage.agent_name !== "Web Surfer" ? (
                                     <div
                                       onClick={() =>
                                         handleOutputSelection(

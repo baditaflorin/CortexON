@@ -15,6 +15,7 @@ from pydantic_ai.result import Usage
 from pydantic_ai.messages import ModelRequest, ModelResponse, ToolReturnPart
 
 from core.browser_manager import PlaywrightManager
+from core.skills.final_response import get_response
 from core.utils.message_type import MessageType
 from core.utils.openai_msg_parser import AgentConversationHandler, ConversationStorage
 from core.utils.custom_exceptions import (
@@ -404,7 +405,9 @@ class Orchestrator:
                     name="Critique Agent",
                     retries=3,
                     model_settings=ModelSettings(temperature=0.5),
-                    result_type=CritiqueOutput
+                    result_type=CritiqueOutput,
+                    result_tool_name='final_response',
+                    result_tool_description='Synthesizes web automation results into a comprehensive final answer addressing the clients original query.'
                 )
                 logger.info("Critique Agent initialized successfully.")
 
@@ -764,17 +767,28 @@ class Orchestrator:
                                         )
 
                                         if critique_data.terminate:
+                                            # Generate final_response if missing
+                                            if not critique_data.final_response:
+                                                # Use current context to generate final response
+                                                final_response = await get_response(
+                                                    plan=plan,
+                                                    browser_response=browser_response.data,
+                                                    current_step=c_step
+                                                )
+                                                logger.info(f"Programmatically generated final response: {final_response}")
+                                            else:
+                                                final_response = critique_data.final_response
+
                                             # Save the conversation history
                                             openai_messages = self.conversation_handler.get_full_conversation()
                                             self.conversation_storage.save_conversation(openai_messages, prefix="task")
                                             
-                                            # Then proceed with notifying and terminating
+                                            # Notify and terminate
                                             await self.browser_manager.notify_user(
-                                                f"{critique_data.final_response}",
+                                                final_response,
                                                 message_type=MessageType.ANSWER,
                                             )
-                                            final_response = critique_data.final_response
-                                            await self.notify_client(f"{final_response}", MessageType.FINAL)
+                                            await self.notify_client(final_response, MessageType.FINAL)
 
                                             if self.response_handler:
                                                 await self.response_handler(final_response)

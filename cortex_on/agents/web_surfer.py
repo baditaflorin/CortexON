@@ -1,30 +1,32 @@
-import aiohttp
+# Standard library imports
 import json
-from typing import Any, Dict, Optional, Tuple, List
-from datetime import datetime
-import uuid
 import os
+import uuid
+from dataclasses import asdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+# Third-party imports
+import aiohttp
+from dotenv import load_dotenv
+from fastapi import WebSocket
+import logfire
 from pydantic_ai.messages import (
+    ArgsJson,
     ModelRequest,
     ModelResponse,
-    UserPromptPart,
     ToolCallPart,
     ToolReturnPart,
-    ArgsJson,
+    UserPromptPart,
 )
-import logfire
-from fastapi import WebSocket
-from dataclasses import asdict
-from dotenv import load_dotenv
 
+# Local application imports
 from utils.stream_response_format import StreamResponse
 
 load_dotenv()
 
-TIMEOUT = 9999999999999999999999999999999999999999999
 
-AUTOSCRAPER_BEARER_TOKEN = os.getenv("AUTOSCRAPER_BEARER_TOKEN")
-AUTOSCRAPER_USER_ID = os.getenv("AUTOSCRAPER_USER_ID")
+TIMEOUT = 9999999999999999999999999999999999999999999
 
 class WebSurfer:
     def __init__(self, api_url: str = "http://localhost:8000/api/v1/web/stream"):
@@ -34,49 +36,37 @@ class WebSurfer:
         self.websocket: Optional[WebSocket] = None
         self.stream_output: Optional[StreamResponse] = None
 
-    async def _make_api_call(
-        self, instruction: str
-    ) -> Tuple[int, List[Dict[str, Any]]]:
-        """Make API call to the web scraping service"""
-        session_timeout = aiohttp.ClientTimeout(total=None,sock_connect=TIMEOUT,sock_read=TIMEOUT)
+    async def _make_api_call(self, instruction: str) -> Tuple[int, List[Dict[str, Any]]]:
+        session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=TIMEOUT, sock_read=TIMEOUT)
         async with aiohttp.ClientSession(timeout=session_timeout) as session:
             final_json_response = []
             try:
-                payload = {"cmd": instruction, "critique_disabled" : False}
+                payload = {"cmd": instruction, "critique_disabled": False}
                 async with session.post(self.api_url, json=payload) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        raise Exception(
-                            f"API call failed with status {response.status}: {error_text}"
-                        )
-                    # return await response.json()
+                        raise Exception(f"API call failed with status {response.status}: {error_text}")
                     if response.content_type == "text/event-stream":
                         async for line in response.content:
-                            line = line.decode(
-                                "utf-8"
-                            ).strip()  # Decode and clean the line
+                            line = line.decode("utf-8").strip()
                             if line:
-                                line = line[
-                                    5:
-                                ].strip()  # Remove the data keyword in the beginning for all
+                                line = line[5:].strip()
                                 event_data = json.loads(line)
                                 if self.stream_output and self.websocket:
-                                    print(f"Event data: {event_data}")
-                                    self.stream_output.steps.append(
-                                        event_data["message"]
-                                    )
-                                    if "live_url" in event_data:
-                                        self.stream_output.live_url = event_data['live_url']
+                                    self.stream_output.steps.append(event_data["message"])
+                                    # Only update live_url if it exists and is not None
+                                    if "live_url" in event_data and event_data["live_url"] is not None:
+                                        self.stream_output.live_url = event_data["live_url"]
+                                    # Send the update with the preserved or updated live_url
                                     await self.websocket.send_text(json.dumps(asdict(self.stream_output)))
+                                    logfire.debug(f"WebSocket message sent: {self.stream_output}")
                                 final_json_response.append(event_data)
-
                     else:
-                        # For non-streaming responses, decode normally
                         return await response.json()
                     return 200, final_json_response
             except Exception as e:
                 print(f"Error making API call: {str(e)}")
-                raise
+                raise e
 
     async def generate_reply(
         self, instruction: str, websocket: WebSocket, stream_output: StreamResponse

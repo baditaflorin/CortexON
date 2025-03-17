@@ -1,12 +1,17 @@
-from fastapi import FastAPI, WebSocket
-from typing import Optional, List
+# Standard library imports
+from typing import List, Optional
 
-from orchestrator import SystemOrchestrator
+# Third-party imports
+from fastapi import FastAPI, WebSocket
+
+# Local application imports
+from instructor import SystemInstructor
+
 
 app: FastAPI = FastAPI()
 
 async def generate_response(task: str, websocket: Optional[WebSocket] = None):
-    orchestrator: SystemOrchestrator = SystemOrchestrator()
+    orchestrator: SystemInstructor = SystemInstructor()
     return await orchestrator.run(task, websocket)
 
 @app.get("/agent/chat")
