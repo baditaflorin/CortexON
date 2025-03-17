@@ -2,6 +2,7 @@ import {
   BrainCircuit,
   ChevronLeft,
   ChevronRight,
+  Component,
   Globe,
   SquareCode,
   SquareSlash,
@@ -112,12 +113,17 @@ const ChatList = ({
         const {agent_name, instructions, steps, output, status_code, live_url} =
           lastJsonMessage as SystemMessage;
 
+        console.log(lastJsonMessage);
+
         // Update live URL if provided
-        if (live_url) {
-          setLiveUrl(live_url);
-          setIsIframeLoading(true);
-          setAnimateIframeEntry(true);
-        } else if (agent_name !== "Web Surfer Agent") {
+        if (live_url && liveUrl.length === 0) {
+          setCurrentOutput(null);
+          setTimeout(() => {
+            setLiveUrl(live_url);
+            setIsIframeLoading(true);
+            setAnimateIframeEntry(true);
+          }, 300);
+        } else if (agent_name !== "Web Surfer") {
           setLiveUrl("");
         }
 
@@ -128,7 +134,7 @@ const ChatList = ({
 
         if (agentIndex !== -1) {
           let filteredSteps = steps;
-          if (agent_name === "Web Surfer Agent") {
+          if (agent_name === "Web Surfer") {
             const plannerStep = steps.find((step) => step.startsWith("Plan"));
             filteredSteps = plannerStep
               ? [
@@ -156,44 +162,46 @@ const ChatList = ({
           });
         }
 
-        if (output && output.length > 0 && agent_name !== "Web Surfer Agent") {
+        if (output && output.length > 0 && agent_name !== "Web Surfer") {
           // Only mark as complete for Orchestrator
           if (agent_name === "Orchestrator") {
             setIsLoading(false);
           }
 
-          setOutputsList((prevList) => {
-            // Check if this agent already has an output
-            const existingIndex = prevList.findIndex(
-              (item) => item.agent === agent_name
-            );
+          if (status_code === 200) {
+            setOutputsList((prevList) => {
+              // Check if this agent already has an output
+              const existingIndex = prevList.findIndex(
+                (item) => item.agent === agent_name
+              );
 
-            let newList;
-            let newOutputIndex; // Track the index of the new/updated output
+              let newList;
+              let newOutputIndex; // Track the index of the new/updated output
 
-            if (existingIndex >= 0) {
-              // Update existing output
-              newList = [...prevList];
-              newList[existingIndex] = {agent: agent_name, output};
-              newOutputIndex = existingIndex;
-            } else {
-              // Add new output
-              newList = [...prevList, {agent: agent_name, output}];
-              newOutputIndex = newList.length - 1;
-            }
+              if (existingIndex >= 0) {
+                // Update existing output
+                newList = [...prevList];
+                newList[existingIndex] = {agent: agent_name, output};
+                newOutputIndex = existingIndex;
+              } else {
+                // Add new output
+                newList = [...prevList, {agent: agent_name, output}];
+                newOutputIndex = newList.length - 1;
+              }
 
-            // Always set the most recent output as current
-            // Use setTimeout to ensure state updates properly
-            setAnimateOutputEntry(false);
+              // Always set the most recent output as current
+              // Use setTimeout to ensure state updates properly
+              setAnimateOutputEntry(false);
 
-            // After a short delay, change the output and trigger entry animation
-            setTimeout(() => {
-              setCurrentOutput(newOutputIndex);
-              setAnimateOutputEntry(true);
-            }, 300);
+              // After a short delay, change the output and trigger entry animation
+              setTimeout(() => {
+                setCurrentOutput(newOutputIndex);
+                setAnimateOutputEntry(true);
+              }, 300);
 
-            return newList;
-          });
+              return newList;
+            });
+          }
         }
 
         // Create a new array to ensure state update
@@ -207,6 +215,7 @@ const ChatList = ({
       }
       return [...prev];
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastJsonMessage, messages.length, setIsLoading, setMessages]);
 
   const getOutputBlock = (type: string, output: string | undefined) => {
@@ -251,16 +260,21 @@ const ChatList = ({
           <SquareSlash size={20} absoluteStrokeWidth className="text-primary" />
         );
 
-      case "Web Surfer Agent":
+      case "Web Surfer":
         return <Globe size={20} absoluteStrokeWidth className="text-primary" />;
 
-      default:
+      case "Planner Agent":
         return (
           <BrainCircuit
             size={20}
             absoluteStrokeWidth
             className="text-primary"
           />
+        );
+
+      default:
+        return (
+          <Component size={20} absoluteStrokeWidth className="text-primary" />
         );
     }
   };
@@ -287,7 +301,7 @@ const ChatList = ({
               absoluteStrokeWidth
               className="text-primary"
             />
-            Check Execution Results
+            Check Executor Results
           </p>
         );
 
@@ -299,11 +313,11 @@ const ChatList = ({
               absoluteStrokeWidth
               className="text-primary"
             />
-            Check Execution Results
+            Check Executor Results
           </p>
         );
 
-      case "Web Surfer Agent":
+      case "Web Surfer":
         return (
           <p className="flex items-center gap-4">
             <Globe size={20} absoluteStrokeWidth className="text-primary" />
@@ -311,7 +325,7 @@ const ChatList = ({
           </p>
         );
 
-      default:
+      case "Planner Agent":
         return (
           <p className="flex items-center gap-4">
             <BrainCircuit
@@ -319,6 +333,14 @@ const ChatList = ({
               absoluteStrokeWidth
               className="text-primary"
             />
+            Check Generated Plan
+          </p>
+        );
+
+      default:
+        return (
+          <p className="flex items-center gap-4">
+            <Component size={20} absoluteStrokeWidth className="text-primary" />
             Check Output
           </p>
         );
@@ -568,8 +590,7 @@ const ChatList = ({
                                   )}
                                 {systemMessage.output &&
                                   systemMessage.output.length > 0 &&
-                                  (systemMessage.agent_name !==
-                                  "Web Surfer Agent" ? (
+                                  (systemMessage.agent_name !== "Web Surfer" ? (
                                     <div
                                       onClick={() =>
                                         handleOutputSelection(
