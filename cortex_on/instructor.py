@@ -94,6 +94,7 @@ class SystemInstructor:
                 deps=deps_for_orchestrator
             )
             stream_output.output = orchestrator_response.data
+            stream_output.status_code = 200
             logfire.debug(f"Orchestrator response: {orchestrator_response.data}")
             await self._safe_websocket_send(stream_output)
 
