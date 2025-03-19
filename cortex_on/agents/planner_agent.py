@@ -10,8 +10,10 @@ from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
 
 # Local application imports
-from utils.ant_client import get_client
+# from utils.ant_client import get_client #We use the new model_factory
+from utils.model_client import get_model
 
+model = get_model()
 
 
 load_dotenv()
@@ -66,10 +68,7 @@ Available agents:
 class PlannerResult(BaseModel):
     plan: str = Field(description="The generated plan in a string format")
 
-model = AnthropicModel(
-    model_name=os.environ.get("ANTHROPIC_MODEL_NAME"),
-    anthropic_client=get_client()
-)
+model = get_model()
 
 planner_agent = Agent(
     model=model,

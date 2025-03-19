@@ -17,6 +17,7 @@ from pydantic_ai.models.anthropic import AnthropicModel
 # Local application imports
 from utils.ant_client import get_client
 from utils.stream_response_format import StreamResponse
+from utils.model_client import get_model
 
 load_dotenv()
 
@@ -237,10 +238,8 @@ async def send_stream_update(ctx: RunContext[CoderAgentDeps], message: str) -> N
         logfire.debug("WebSocket message sent: {stream_output_json}", stream_output_json=stream_output_json)
 
 # Initialize the model
-model = AnthropicModel(
-    model_name=os.environ.get("ANTHROPIC_MODEL_NAME"),
-    anthropic_client=get_client()
-)
+model = get_model()
+
 
 # Initialize the agent
 coder_agent = Agent(
